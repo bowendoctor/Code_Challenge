@@ -1,0 +1,388 @@
+
+<!-- saved from url=(0043)file:///Users/jstouli/Downloads/Hello!.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"></head><body><p>This challenge is used by MediaMath for evaluating candidates to data engineering positions.</p>
+
+
+
+<h1 id="background">Background</h1>
+
+<p>Advertisers want to understand how digital advertising generates interactions with their brands and websites: clicks, visits, purchases, etc. MediaMath collects such interactions and ties them to the ads that are displayed online through a process called attribution.</p>
+
+
+
+<h1 id="the-challenge">The challenge</h1>
+
+
+
+<h2 id="product-specification">Product specification</h2>
+
+<p>The goal of this challenge is to write a simple attribution application that produces a report that can then be fed into a database.</p>
+
+<p><strong>Definitions:</strong></p>
+
+<ul>
+<li>Event: a user’s interaction with a website.</li>
+<li>Impression: an occurrence of an ad displayed to a user on a website.</li>
+<li>Attributed event: an event that happened chronologically after an impression and is considered to be the result of that impression. The advertiser and the user of both the impression and the event have to be the same for the event to be attributable. Example: a user buying an object after seeing an ad from an advertiser.</li>
+</ul>
+
+<p>The goal of the application if to attribute events with relevant impressions by running the following two operations on the provided datasets.</p>
+
+
+
+<h3 id="attribution">Attribution</h3>
+
+<p>The application will process input datasets of events and impressions to compute attributed events and output some simple statistics on them.</p>
+
+<p>The statistics that the application should compute are:</p>
+
+<ul>
+<li>The count of attributed events for each advertiser, grouped by event type.</li>
+<li>The count of unique users that have generated attributed events for each advertiser, grouped by event type.</li>
+</ul>
+
+<p><strong>Example:</strong> <br>
+Consider the following series of events and impressions:</p>
+
+<table>
+<thead>
+<tr>
+  <th>Timestamp</th>
+  <th>Advertiser ID</th>
+  <th>User ID</th>
+  <th>Should it be attributed?</th>
+</tr>
+</thead>
+<tbody><tr>
+  <td>event</td>
+  <td>1450631448</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+</tr>
+<tr>
+  <td>impression</td>
+  <td>1450631450</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+</tr>
+<tr>
+  <td>event</td>
+  <td>1450631452</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+</tr>
+<tr>
+  <td>event</td>
+  <td>1450631464</td>
+  <td>1</td>
+  <td>16340204-80e3-411f-82a1-e154c0845cae</td>
+</tr>
+<tr>
+  <td>event</td>
+  <td>1450631466</td>
+  <td>2</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+</tr>
+<tr>
+  <td>event</td>
+  <td>1450631468</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+</tr>
+</tbody></table>
+
+
+<p>Here, the statistics generated should be:</p>
+
+<ul>
+<li>Advertiser 1: 1 attributed event, 1 unique user</li>
+<li>Advertiser 2: 0 attributed event, 0 unique user that has generated an attributed</li>
+</ul>
+
+<p>As noted in the specification, the count of attributed events should be grouped by event type which has been left out of this example.</p>
+
+
+
+<h3 id="de-duplication">De-duplication</h3>
+
+<p>Events are sometimes registered multiple times in the events dataset when they actually should be counted only once. For instance, a user might click on an ad twice by mistake.</p>
+
+<p>When running the attribution process we want to de-duplicate these events: for a given user / advertiser / event type combination, we want to remove events that happen more than once every minute.</p>
+
+<p><strong>Example with a series of events (more info on the schema below):</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Timestamp</th>
+  <th>Event ID</th>
+  <th>Advertiser ID</th>
+  <th>User ID</th>
+  <th>Event Type</th>
+</tr>
+</thead>
+<tbody><tr>
+  <td>1450631450</td>
+  <td>5bb2b119-226d-4bdf-95ad-a1cdf9659789</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+  <td>click</td>
+</tr>
+<tr>
+  <td>1450631452</td>
+  <td>23aa6216-3997-4255-9e10-7e37a1f07060</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+  <td>click</td>
+</tr>
+<tr>
+  <td>1450631464</td>
+  <td>61c3ed32-01f9-43c4-8f54-eee3857104cc</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+  <td>purchase</td>
+</tr>
+<tr>
+  <td>1450631466</td>
+  <td>20702cb7-60ca-413a-8244-d22353e2be49</td>
+  <td>1</td>
+  <td>60b74052-fd7e-48e4-aa61-3c14c9c714d5</td>
+  <td>click</td>
+</tr>
+</tbody></table>
+
+
+<p>In this example, the events with timestamps 1450631450, 1450631452 and 1450631466 have less than 60 seconds of difference and are duplicates because they are of the same type (click), for the same advertiser and with the same user ID. The last two events (23aa6216-3997-4255-9e10-7e37a1f07060 and 20702cb7-60ca-413a-8244-d22353e2be49) should be removed and only the first one (5bb2b119-226d-4bdf-95ad-a1cdf9659789) should be kept after de-duplication.</p>
+
+<p>The event with timestamp 1450631464 would not be removed as it’s a different event type (purchase vs click) despite being the same advertiser and user.</p>
+
+
+
+<h2 id="inputs">Inputs</h2>
+
+<p>Two datasets in CSV format are provided for this challenge. Their schemas are provided below.</p>
+
+
+
+<h3 id="events">Events</h3>
+
+<p>This dataset contains a series of interactions of users with brands: <a href="file:///Users/jstouli/Downloads/events.csv">events.csv</a></p>
+
+<p><strong>Schema:</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Column number</th>
+  <th>Column name</th>
+  <th>Type</th>
+  <th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+  <td>1</td>
+  <td>timestamp</td>
+  <td>integer</td>
+  <td>Unix timestamp when the event happened.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>event_id</td>
+  <td>string (UUIDv4)</td>
+  <td>Unique ID for the event.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>advertiser_id</td>
+  <td>integer</td>
+  <td>The advertiser ID that the user interacted with.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>user_id</td>
+  <td>string (UUIDv4)</td>
+  <td>An anonymous user ID that generated the event.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>event_type</td>
+  <td>string</td>
+  <td>The type of event. Potential values: click, visit, purchase</td>
+</tr>
+</tbody></table>
+
+
+
+
+<h3 id="impressions">Impressions</h3>
+
+<p>This dataset contains a series of ads displayed to users online for different advertisers: <a href="file:///Users/jstouli/Downloads/impressions.csv">impressions.csv</a></p>
+
+<p><strong>Schema:</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Column number</th>
+  <th>Column name</th>
+  <th>Type</th>
+  <th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+  <td>1</td>
+  <td>timestamp</td>
+  <td>integer</td>
+  <td>Unix timestamp when the impression was served.</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>advertiser_id</td>
+  <td>integer</td>
+  <td>The advertiser ID that owns the ad that was displayed.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>creative_id</td>
+  <td>integer</td>
+  <td>The creative (or ad) ID that was displayed.</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>user_id</td>
+  <td>string (UUIDv4)</td>
+  <td>An anonymous user ID this ad was displayed to.</td>
+</tr>
+</tbody></table>
+
+
+
+
+<h2 id="outputs">Outputs</h2>
+
+<p>The attribution application must process the provided datasets and produce the following two CSV files as its output.</p>
+
+
+
+<h3 id="count-of-events">Count of events</h3>
+
+<p>The first file must be named <code>count_of_events.csv</code> and will contain the <strong>count of events for each advertiser, grouped by event type</strong>.</p>
+
+<p><strong>Schema:</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Column number</th>
+  <th>Column name</th>
+  <th>Type</th>
+  <th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+  <td>1</td>
+  <td>advertiser_id</td>
+  <td>integer</td>
+  <td>The advertiser ID</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>event_type</td>
+  <td>string</td>
+  <td>The type of event. Potential values: click, visit, purchase</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>count</td>
+  <td>int</td>
+  <td>The count of events for this advertiser ID and event type.</td>
+</tr>
+</tbody></table>
+
+
+
+
+<h3 id="count-of-unique-users">Count of unique users</h3>
+
+<p>The second file must be named <code>count_of_users.csv</code> and will contain the <strong>count of unique users for each advertiser, grouped by event type</strong>.</p>
+
+<p><strong>Schema:</strong></p>
+
+<table>
+<thead>
+<tr>
+  <th>Column number</th>
+  <th>Column name</th>
+  <th>Type</th>
+  <th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+  <td>1</td>
+  <td>advertiser_id</td>
+  <td>integer</td>
+  <td>The advertiser ID</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>event_type</td>
+  <td>string</td>
+  <td>The type of event. Potential values: click, visit, purchase</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>count</td>
+  <td>int</td>
+  <td>The count of unique users for this advertiser ID and event type.</td>
+</tr>
+</tbody></table>
+
+
+<p>If a user had generated multiple event types for a given advertiser, the user should be counted multiple times (once for each event type). The sum of the unique users by group can be higher than the unique users of the advertiser across groups.</p>
+
+
+
+<h1 id="rules-of-the-game">Rules of the game</h1>
+
+<p>This challenge is a chance for MediaMath engineers to see how you code and organize a project to implement a specification.</p>
+
+
+
+<h2 id="deliverables">Deliverables</h2>
+
+<p>The expected deliverable is a fully functional project that includes the following:</p>
+
+<ul>
+<li>Code of the application.</li>
+<li>Test suite for the application.</li>
+<li>Documentation for launching a development environment and running the application.</li>
+<li>Output files (<code>count_of_events.csv</code> and <code>count_of_users.csv</code>) generated by your application when you run it.</li>
+</ul>
+
+
+
+<h2 id="technical-stack">Technical stack</h2>
+
+<p>The application must use the following technologies:</p>
+
+<ul>
+<li>Java <strong>or</strong> Scala <strong>or</strong> Python</li>
+<li>Hadoop <strong>or</strong> Spark</li>
+</ul>
+
+<p>Except for these requirements, feel free to use whichever libraries, frameworks or tools you deem necessary. </p>
+
+
+
+<h2 id="expectations">Expectations</h2>
+
+<p>Your code will be reviewed by multiple engineers and can serve as the base for a discussion in interviews. <br>
+We want to see how you approach working on a complete project and strongly recommend that you work on this challenge alone.</p>
+
+<p>Feel free to ask any question that might help you understand the specifications or requirements better (as you would in your work) if anything is unclear.</p>
+
+
+
+<h2 id="delivery">Delivery</h2>
+
+<p>Your application can be sent to us through a GitHub repository (in which case you are welcome to fork this repository) or as a compressed archive containing all the deliverables. </p></body></html>
